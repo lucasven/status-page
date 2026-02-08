@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Status - Lucas Venturella Services</title>
+  <meta http-equiv="refresh" content="60">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { 
+      font-size: 1.5rem; 
+      font-weight: 600; 
+      margin-bottom: 0.5rem;
+      color: #f8fafc;
+    }
+    .subtitle { color: #94a3b8; margin-bottom: 2rem; font-size: 0.875rem; }
+    .services { display: flex; flex-direction: column; gap: 1rem; }
+    .service {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 1.5rem;
+      border: 1px solid #334155;
+    }
+    .service-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .service-name { font-weight: 600; font-size: 1.125rem; }
+    .status-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .status-ok { background: #065f46; color: #6ee7b7; }
+    .status-degraded { background: #78350f; color: #fcd34d; }
+    .status-down { background: #7f1d1d; color: #fca5a5; }
+    .status-checking { background: #1e3a5f; color: #93c5fd; }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .metric {
+      background: #0f172a;
+      padding: 0.75rem;
+      border-radius: 8px;
+    }
+    .metric-label { font-size: 0.75rem; color: #94a3b8; }
+    .metric-value { font-size: 1rem; font-weight: 600; margin-top: 0.25rem; }
+    .whatsapp-connected { color: #6ee7b7; }
+    .whatsapp-disconnected { color: #fca5a5; }
+    .footer {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid #334155;
+      font-size: 0.75rem;
+      color: #64748b;
+      text-align: center;
+    }
+    .error-msg {
+      background: #7f1d1d;
+      color: #fca5a5;
+      padding: 0.5rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 Status dos Serviços</h1>
+    <p class="subtitle">Atualizado automaticamente a cada 60 segundos</p>
+
+    <div class="services">
+      <div class="service" id="nexfinapp">
+        <div class="service-header">
+          <span class="service-name">💰 NexFinApp</span>
+          <span class="status-badge status-checking" id="nexfinapp-status">Verificando...</span>
+        </div>
+        <div class="metrics" id="nexfinapp-metrics">
+          <div class="metric">
+            <div class="metric-label">WhatsApp</div>
+            <div class="metric-value" id="nexfinapp-whatsapp">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Uptime</div>
+            <div class="metric-value" id="nexfinapp-uptime">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Última verificação</div>
+            <div class="metric-value" id="nexfinapp-checked">-</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="service" id="resumobot">
+        <div class="service-header">
+          <span class="service-name">📝 Resumobot</span>
+          <span class="status-badge status-checking" id="resumobot-status">Verificando...</span>
+        </div>
+        <div class="metrics" id="resumobot-metrics">
+          <div class="metric">
+            <div class="metric-label">WhatsApp</div>
+            <div class="metric-value" id="resumobot-whatsapp">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Uptime</div>
+            <div class="metric-value" id="resumobot-uptime">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Última verificação</div>
+            <div class="metric-value" id="resumobot-checked">-</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>Status page by Alfred 🎩 • <span id="last-update"></span></p>
+    </div>
+  </div>
+
+  <script>
+    // Configure your endpoints here
+    const SERVICES = {
+      nexfinapp: {
+        name: 'NexFinApp',
+        healthUrl: 'https://nexfinapp-bot-production.up.railway.app/health'
+      },
+      resumobot: {
+        name: 'Resumobot', 
+        healthUrl: 'https://resumobot-bot-production.up.railway.app/health'
+      }
+    };
+
+    function formatUptime(seconds) {
+      if (seconds < 60) return `${seconds}s`;
+      if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+      return `${Math.floor(seconds / 86400)}d ${Math.floor((seconds % 86400) / 3600)}h`;
+    }
+
+    async function checkService(id, config) {
+      const statusEl = document.getElementById(`${id}-status`);
+      const whatsappEl = document.getElementById(`${id}-whatsapp`);
+      const uptimeEl = document.getElementById(`${id}-uptime`);
+      const checkedEl = document.getElementById(`${id}-checked`);
+      const serviceEl = document.getElementById(id);
+
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        
+        const res = await fetch(config.healthUrl, { 
+          signal: controller.signal,
+          mode: 'cors'
+        });
+        clearTimeout(timeout);
+        
+        const data = await res.json();
+        
+        // Update status badge
+        statusEl.textContent = data.status === 'ok' ? 'Operacional' : 'Degradado';
+        statusEl.className = `status-badge ${data.status === 'ok' ? 'status-ok' : 'status-degraded'}`;
+        
+        // Update WhatsApp status
+        const waState = data.whatsapp?.state || 'unknown';
+        whatsappEl.textContent = waState === 'connected' ? '✅ Conectado' : '❌ Desconectado';
+        whatsappEl.className = `metric-value ${waState === 'connected' ? 'whatsapp-connected' : 'whatsapp-disconnected'}`;
+        
+        // Update uptime
+        const uptime = data.whatsapp?.uptimeSeconds || 0;
+        uptimeEl.textContent = uptime > 0 ? formatUptime(uptime) : '-';
+        
+        // Remove any error messages
+        const existingError = serviceEl.querySelector('.error-msg');
+        if (existingError) existingError.remove();
+        
+      } catch (err) {
+        statusEl.textContent = 'Offline';
+        statusEl.className = 'status-badge status-down';
+        whatsappEl.textContent = '❓ Desconhecido';
+        whatsappEl.className = 'metric-value';
+        uptimeEl.textContent = '-';
+        
+        // Show error
+        const existingError = serviceEl.querySelector('.error-msg');
+        if (!existingError) {
+          const errorDiv = document.createElement('div');
+          errorDiv.className = 'error-msg';
+          errorDiv.textContent = `Erro: ${err.message}`;
+          serviceEl.appendChild(errorDiv);
+        }
+      }
+      
+      checkedEl.textContent = new Date().toLocaleTimeString('pt-BR');
+    }
+
+    async function checkAllServices() {
+      document.getElementById('last-update').textContent = new Date().toLocaleString('pt-BR');
+      
+      for (const [id, config] of Object.entries(SERVICES)) {
+        await checkService(id, config);
+      }
+    }
+
+    // Initial check
+    checkAllServices();
+    
+    // Note: Auto-refresh is handled by meta refresh tag
+    // For more dynamic updates, uncomment below:
+    // setInterval(checkAllServices, 60000);
+  </script>
+</body>
+</html>
